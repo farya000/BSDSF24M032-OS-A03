@@ -43,39 +43,62 @@ char** tokenize(char* cmdline) {
     if (cmdline == NULL || cmdline[0] == '\0')
         return NULL;
 
-    char** arglist = malloc(sizeof(char*) * (MAXARGS + 1));
+    char** args = calloc(MAXARGS + 1, sizeof(char*));
+    int count = 0;
+    char* p = cmdline;
 
-    for (int i = 0; i < MAXARGS + 1; i++) {
-        arglist[i] = calloc(ARGLEN, sizeof(char));
-    }
+    while (*p) {
+        while (*p == ' ' || *p == '\t')
+            p++;
+        if (*p == '\0')
+            break;
 
-    char* cp = cmdline;
-    int argnum = 0;
-
-    while (*cp != '\0' && argnum < MAXARGS) {
-        while (*cp == ' ' || *cp == '\t') cp++;
-        if (*cp == '\0') break;
-
-        int len = 0;
-        while (cp[len] != '\0' && cp[len] != ' ' &&
-               cp[len] != '\t' && len < ARGLEN - 1) {
-            len++;
+        if (*p == '<' || *p == '>' || *p == '|') {
+            if (count >= MAXARGS) break;
+            args[count++] = strndup(p, 1);
+            p++;
+            continue;
         }
 
-        strncpy(arglist[argnum], cp, len);
-        argnum++;
-        cp += len;
+        char token[ARGLEN * 8];
+        int len = 0;
+        char quote = '\0';
+
+        while (*p) {
+            if (quote) {
+                if (*p == quote) {
+                    quote = '\0';
+                    p++;
+                } else if (len < (int)sizeof(token) - 1) {
+                    token[len++] = *p++;
+                } else {
+                    p++;
+                }
+            } else if (*p == '"' || *p == '\'') {
+                quote = *p++;
+            } else if (*p == ' ' || *p == '\t' ||
+                       *p == '<' || *p == '>' || *p == '|') {
+                break;
+            } else if (len < (int)sizeof(token) - 1) {
+                token[len++] = *p++;
+            } else {
+                p++;
+            }
+        }
+
+        token[len] = '\0';
+        if (len > 0 && count < MAXARGS)
+            args[count++] = strdup(token);
     }
 
-    if (argnum == 0) {
-        for (int i = 0; i < MAXARGS + 1; i++)
-            free(arglist[i]);
-        free(arglist);
+    args[count] = NULL;
+
+    if (count == 0) {
+        free(args);
         return NULL;
     }
 
-    arglist[argnum] = NULL;
-    return arglist;
+    return args;
 }
 
 int handle_builtin(char** arglist) {
