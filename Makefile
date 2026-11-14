@@ -1,3 +1,4 @@
+
 CC = gcc
 CFLAGS = -Wall -Wextra -Iinclude
 
@@ -9,7 +10,7 @@ TARGET = bin/psh
 all: $(TARGET)
 
 $(TARGET): $(OBJ)
-	gcc -o $(TARGET) $(OBJ)
+	gcc -o $(TARGET) $(OBJ) -lreadline
 
 obj/%.o: src/%.c
 	gcc $(CFLAGS) -c $< -o $@
@@ -18,3 +19,4 @@ clean:
 	rm -f obj/*.o bin/psh
 
 .PHONY: all clean
+

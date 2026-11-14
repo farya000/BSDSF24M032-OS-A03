@@ -1,58 +1,75 @@
+
 #include "shell.h"
+#include <readline/readline.h>
+#include <readline/history.h>
+
+
+static char *command_generator(const char *text, int state) {
+    static const char *commands[] = {
+        "cd", "exit", "help", "jobs", "history",
+        "pwd", "whoami", "date", "ls", "cat",
+        "mkdir", "rm", "cp", "mv", "clear", "echo", NULL
+    };
+    static int index, len;
+
+    if (!state) {
+        index = 0;
+        len = strlen(text);
+    }
+
+    while (commands[index] != NULL) {
+        const char *cmd = commands[index++];
+        if (strncmp(cmd, text, len) == 0)
+            return strdup(cmd);
+    }
+    return NULL;
+}
+
+static char **shell_completion(const char *text, int start, int end) {
+    (void)end;
+    if (start == 0)
+        return rl_completion_matches(text, command_generator);
+    return rl_completion_matches(text, rl_filename_completion_function);
+}
 
 char* read_cmd(char* prompt, FILE* fp) {
-    printf("%s", prompt);
-    char* cmdline = (char*) malloc(sizeof(char) * MAX_LEN);
-    int c, pos = 0;
-
-    while ((c = getc(fp)) != EOF) {
-        if (c == '\n') break;
-        cmdline[pos++] = c;
-    }
-
-    if (c == EOF && pos == 0) {
-        free(cmdline);
-        return NULL; // Handle Ctrl+D
-    }
-    
-    cmdline[pos] = '\0';
-    return cmdline;
+    rl_attempted_completion_function = shell_completion;
+    rl_bind_key('\t', rl_complete);
+    (void)fp;
+    return readline(prompt);
 }
 
 char** tokenize(char* cmdline) {
-    // Edge case: empty command line
-    if (cmdline == NULL || cmdline[0] == '\0' || cmdline[0] == '\n') {
+    if (cmdline == NULL || cmdline[0] == '\0')
         return NULL;
-    }
 
-    char** arglist = (char**)malloc(sizeof(char*) * (MAXARGS + 1));
+    char** arglist = malloc(sizeof(char*) * (MAXARGS + 1));
+
     for (int i = 0; i < MAXARGS + 1; i++) {
-        arglist[i] = (char*)malloc(sizeof(char) * ARGLEN);
-        bzero(arglist[i], ARGLEN);
+        arglist[i] = calloc(ARGLEN, sizeof(char));
     }
 
     char* cp = cmdline;
-    char* start;
-    int len;
     int argnum = 0;
 
     while (*cp != '\0' && argnum < MAXARGS) {
-        while (*cp == ' ' || *cp == '\t') cp++; // Skip leading whitespace
-        
-        if (*cp == '\0') break; // Line was only whitespace
+        while (*cp == ' ' || *cp == '\t') cp++;
+        if (*cp == '\0') break;
 
-        start = cp;
-        len = 1;
-        while (*++cp != '\0' && !(*cp == ' ' || *cp == '\t')) {
+        int len = 0;
+        while (cp[len] != '\0' && cp[len] != ' ' &&
+               cp[len] != '\t' && len < ARGLEN - 1) {
             len++;
         }
-        strncpy(arglist[argnum], start, len);
-        arglist[argnum][len] = '\0';
+
+        strncpy(arglist[argnum], cp, len);
         argnum++;
+        cp += len;
     }
 
-    if (argnum == 0) { // No arguments were parsed
-        for(int i = 0; i < MAXARGS + 1; i++) free(arglist[i]);
+    if (argnum == 0) {
+        for (int i = 0; i < MAXARGS + 1; i++)
+            free(arglist[i]);
         free(arglist);
         return NULL;
     }
@@ -90,31 +107,34 @@ int handle_builtin(char** arglist) {
         printf("Job control not yet implemented.\n");
         return 1;
     }
+
     return 0;
 }
 
 #define HISTORY_SIZE 20
 
-static char* history_list[HISTORY_SIZE];
+static char* command_history[HISTORY_SIZE];
 static int history_count = 0;
 
-void add_history(char* cmd) {
+void store_history(char* cmd) {
     if (history_count == HISTORY_SIZE) {
-        free(history_list[0]);
+        free(command_history[0]);
         for (int i = 1; i < HISTORY_SIZE; i++)
-            history_list[i - 1] = history_list[i];
+            command_history[i - 1] = command_history[i];
         history_count--;
     }
-    history_list[history_count++] = strdup(cmd);
+
+    command_history[history_count++] = strdup(cmd);
+    add_history(cmd);
 }
 
 void show_history(void) {
     for (int i = 0; i < history_count; i++)
-        printf("%d  %s\n", i + 1, history_list[i]);
+        printf("%d  %s\n", i + 1, command_history[i]);
 }
 
 char* get_history(int n) {
     if (n < 1 || n > history_count)
         return NULL;
-    return history_list[n - 1];
+    return command_history[n - 1];
 }

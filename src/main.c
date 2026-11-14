@@ -13,7 +13,7 @@ int main() {
 
             if (old_cmd == NULL) {
                 printf("Invalid history number.\n");
-                add_history(cmdline);
+                store_history(cmdline);
                 free(exec_line);
                 free(cmdline);
                 continue;
@@ -24,7 +24,7 @@ int main() {
             printf("%s\n", exec_line);
         }
 
-        add_history(cmdline);
+        store_history(cmdline);
         free(cmdline);
         cmdline = exec_line;
 
