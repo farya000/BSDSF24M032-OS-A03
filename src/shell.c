@@ -78,6 +78,12 @@ int handle_builtin(char** arglist) {
         printf("cd <directory> - Change directory\n");
         printf("help - Display this help message\n");
         printf("jobs - Display job control status\n");
+        printf("history - Display command history\n");
+        printf("!n - Execute a previous command\n");
+        return 1;
+    }
+    else if (strcmp(arglist[0], "history") == 0) {
+        show_history();
         return 1;
     }
     else if (strcmp(arglist[0], "jobs") == 0) {
@@ -85,4 +91,30 @@ int handle_builtin(char** arglist) {
         return 1;
     }
     return 0;
+}
+
+#define HISTORY_SIZE 20
+
+static char* history_list[HISTORY_SIZE];
+static int history_count = 0;
+
+void add_history(char* cmd) {
+    if (history_count == HISTORY_SIZE) {
+        free(history_list[0]);
+        for (int i = 1; i < HISTORY_SIZE; i++)
+            history_list[i - 1] = history_list[i];
+        history_count--;
+    }
+    history_list[history_count++] = strdup(cmd);
+}
+
+void show_history(void) {
+    for (int i = 0; i < history_count; i++)
+        printf("%d  %s\n", i + 1, history_list[i]);
+}
+
+char* get_history(int n) {
+    if (n < 1 || n > history_count)
+        return NULL;
+    return history_list[n - 1];
 }
