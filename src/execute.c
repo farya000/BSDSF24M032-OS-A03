@@ -56,7 +56,26 @@ static void run_command(char** tokens) {
     exit(1);
 }
 
-int execute(char** arglist) {
+int execute(char** arglist, int background, const char* command) {
+
+    /* Background execution: a supervisor waits for the actual command. */
+    if (background) {
+        pid_t pid = fork();
+
+        if (pid < 0) {
+            perror("fork");
+            return -1;
+        }
+
+        if (pid == 0) {
+            execute(arglist, 0, command);
+            _exit(0);
+        }
+
+        add_background_job(pid, command);
+        return 0;
+    }
+
     int pipe_pos = -1;
 
     for (int i = 0; arglist[i] != NULL; i++) {
@@ -97,6 +116,7 @@ int execute(char** arglist) {
     }
 
     pid_t pid1 = fork();
+
     if (pid1 == 0) {
         dup2(fd[1], STDOUT_FILENO);
         close(fd[0]);
@@ -104,7 +124,15 @@ int execute(char** arglist) {
         run_command(left);
     }
 
+    if (pid1 < 0) {
+        perror("fork");
+        close(fd[0]);
+        close(fd[1]);
+        return -1;
+    }
+
     pid_t pid2 = fork();
+
     if (pid2 == 0) {
         dup2(fd[0], STDIN_FILENO);
         close(fd[0]);
@@ -112,11 +140,15 @@ int execute(char** arglist) {
         run_command(right);
     }
 
+    if (pid2 < 0)
+        perror("fork");
+
     close(fd[0]);
     close(fd[1]);
 
-    if (pid1 > 0) waitpid(pid1, NULL, 0);
-    if (pid2 > 0) waitpid(pid2, NULL, 0);
+    waitpid(pid1, NULL, 0);
+    if (pid2 > 0)
+        waitpid(pid2, NULL, 0);
 
     return 0;
 }

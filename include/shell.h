@@ -15,12 +15,21 @@
 #define ARGLEN 30
 #define PROMPT "FCIT> "
 
+typedef struct {
+    pid_t pid;
+    char command[MAX_LEN];
+} BackgroundJob;
+
 char* read_cmd(char* prompt, FILE* fp);
 char** tokenize(char* cmdline);
-int execute(char** arglist);
+int execute(char** arglist, int background, const char* command);
 int handle_builtin(char** arglist);
 void store_history(char* cmd);
 void show_history(void);
 char* get_history(int n);
+
+void add_background_job(pid_t pid, const char* command);
+void reap_background_jobs(void);
+void show_jobs(void);
 
 #endif

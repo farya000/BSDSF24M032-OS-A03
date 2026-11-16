@@ -53,7 +53,7 @@ char** tokenize(char* cmdline) {
         if (*p == '\0')
             break;
 
-        if (*p == '<' || *p == '>' || *p == '|') {
+        if (*p == '<' || *p == '>' || *p == '|' || *p == '&') {
             if (count >= MAXARGS) break;
             args[count++] = strndup(p, 1);
             p++;
@@ -77,7 +77,7 @@ char** tokenize(char* cmdline) {
             } else if (*p == '"' || *p == '\'') {
                 quote = *p++;
             } else if (*p == ' ' || *p == '\t' ||
-                       *p == '<' || *p == '>' || *p == '|') {
+                       *p == '<' || *p == '>' || *p == '|' || *p == '&') {
                 break;
             } else if (len < (int)sizeof(token) - 1) {
                 token[len++] = *p++;
@@ -127,7 +127,7 @@ int handle_builtin(char** arglist) {
         return 1;
     }
     else if (strcmp(arglist[0], "jobs") == 0) {
-        printf("Job control not yet implemented.\n");
+        show_jobs();
         return 1;
     }
 
@@ -160,4 +160,56 @@ char* get_history(int n) {
     if (n < 1 || n > history_count)
         return NULL;
     return command_history[n - 1];
+}
+
+#define MAX_JOBS 100
+
+static BackgroundJob background_jobs[MAX_JOBS];
+static int job_count = 0;
+
+void add_background_job(pid_t pid, const char* command) {
+    if (job_count >= MAX_JOBS) {
+        printf("Background job list is full.\n");
+        return;
+    }
+
+    background_jobs[job_count].pid = pid;
+    snprintf(background_jobs[job_count].command, MAX_LEN, "%s", command);
+    job_count++;
+
+    printf("[%d] %d running in background\n", job_count, pid);
+}
+
+void reap_background_jobs(void) {
+    int status;
+    pid_t pid;
+
+    while ((pid = waitpid(-1, &status, WNOHANG)) > 0) {
+        for (int i = 0; i < job_count; i++) {
+            if (background_jobs[i].pid == pid) {
+                printf("\n[%d] %d completed: %s\n",
+                       i + 1, pid, background_jobs[i].command);
+
+                for (int j = i; j < job_count - 1; j++)
+                    background_jobs[j] = background_jobs[j + 1];
+
+                job_count--;
+                break;
+            }
+        }
+    }
+}
+
+void show_jobs(void) {
+    if (job_count == 0) {
+        printf("No background jobs.\n");
+        return;
+    }
+
+    for (int i = 0; i < job_count; i++) {
+        printf("[%d] PID: %d  Running: %s\n",
+               i + 1,
+               background_jobs[i].pid,
+               background_jobs[i].command);
+    }
 }
