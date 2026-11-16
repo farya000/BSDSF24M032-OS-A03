@@ -1,3 +1,4 @@
+
 #include "shell.h"
 
 #define MAX_IF_LINES 100
@@ -17,6 +18,7 @@ static char* trim(char* s) {
         s++;
 
     size_t len = strlen(s);
+
     while (len > 0 &&
            (s[len - 1] == ' ' || s[len - 1] == '\t' ||
             s[len - 1] == '\n'))
@@ -32,6 +34,7 @@ static int process_command(char* command) {
         return 0;
 
     char* saved_command = strdup(command);
+
     if (saved_command == NULL)
         return 1;
 
@@ -43,6 +46,7 @@ static int process_command(char* command) {
     }
 
     int count = 0;
+
     while (arglist[count] != NULL)
         count++;
 
@@ -57,10 +61,22 @@ static int process_command(char* command) {
     int result = 0;
 
     if (arglist[0] != NULL) {
-        if (background) {
-            result = execute(arglist, 1, saved_command);
-        } else if (handle_builtin(arglist) == 0) {
-            result = execute(arglist, 0, saved_command);
+        /* Variable assignment: do not fork */
+
+        if (count == 1 && is_variable_assignment(arglist[0])) {
+            result = assign_shell_variable(arglist[0]);
+        }
+        else {
+            /* Expand variables before executing commands */
+
+            expand_shell_variables(arglist);
+
+            if (background) {
+                result = execute(arglist, 1, saved_command);
+            }
+            else if (handle_builtin(arglist) == 0) {
+                result = execute(arglist, 0, saved_command);
+            }
         }
     }
 
@@ -105,14 +121,18 @@ static int execute_if(char* first_line) {
 
     if (*condition == '\0') {
         condition = read_cmd("if> ", stdin);
+
         if (condition == NULL)
             return 1;
 
         condition = strdup(condition);
+
         if (condition == NULL)
             return 1;
-    } else {
+    }
+    else {
         condition = strdup(condition);
+
         if (condition == NULL)
             return 1;
     }
@@ -130,6 +150,7 @@ static int execute_if(char* first_line) {
         printf("Expected 'then'.\n");
         free(line);
         free(condition);
+
         return 1;
     }
 
@@ -140,6 +161,7 @@ static int execute_if(char* first_line) {
 
     char* then_lines[MAX_IF_LINES];
     char* else_lines[MAX_IF_LINES];
+
     int then_count = 0;
     int else_count = 0;
     int in_else = 0;
@@ -168,19 +190,23 @@ static int execute_if(char* first_line) {
 
     if (!found_fi) {
         printf("Error: missing 'fi'.\n");
+
         free(condition);
         free_lines(then_lines, then_count);
         free_lines(else_lines, else_count);
+
         return 1;
     }
 
     int status = process_line(condition);
+
     free(condition);
 
     if (status == 0) {
         for (int i = 0; i < then_count; i++)
             process_line(then_lines[i]);
-    } else {
+    }
+    else {
         for (int i = 0; i < else_count; i++)
             process_line(else_lines[i]);
     }
@@ -212,10 +238,11 @@ int main(void) {
             }
 
             char* exec_line = strdup(old_cmd);
+
             printf("%s\n", exec_line);
+
             store_history(cmdline);
             free(cmdline);
-            free(cmdline = NULL);
 
             if (exec_line != NULL) {
                 if (is_if_line(exec_line))
@@ -240,6 +267,8 @@ int main(void) {
     }
 
     reap_background_jobs();
+
     printf("\nShell exited.\n");
+
     return 0;
 }

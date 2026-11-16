@@ -1,3 +1,4 @@
+
 #ifndef SHELL_H
 #define SHELL_H
 
@@ -22,8 +23,10 @@ typedef struct {
 
 char* read_cmd(char* prompt, FILE* fp);
 char** tokenize(char* cmdline);
+
 int execute(char** arglist, int background, const char* command);
 int handle_builtin(char** arglist);
+
 void store_history(char* cmd);
 void show_history(void);
 char* get_history(int n);
@@ -31,5 +34,10 @@ char* get_history(int n);
 void add_background_job(pid_t pid, const char* command);
 void reap_background_jobs(void);
 void show_jobs(void);
+
+/* Shell variables */
+int is_variable_assignment(const char* token);
+int assign_shell_variable(const char* token);
+void expand_shell_variables(char** arglist);
 
 #endif
