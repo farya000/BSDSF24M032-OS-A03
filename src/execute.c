@@ -96,8 +96,19 @@ int execute(char** arglist, int background, const char* command) {
         if (pid == 0)
             run_command(arglist);
 
-        waitpid(pid, NULL, 0);
-        return 0;
+        int status;
+        if (waitpid(pid, &status, 0) < 0) {
+            perror("waitpid");
+            return 1;
+        }
+
+        if (WIFEXITED(status))
+            return WEXITSTATUS(status);
+
+        if (WIFSIGNALED(status))
+            return 128 + WTERMSIG(status);
+
+        return 1;
     }
 
     arglist[pipe_pos] = NULL;
@@ -146,9 +157,19 @@ int execute(char** arglist, int background, const char* command) {
     close(fd[0]);
     close(fd[1]);
 
-    waitpid(pid1, NULL, 0);
-    if (pid2 > 0)
-        waitpid(pid2, NULL, 0);
+    int status1, status2;
 
-    return 0;
+    waitpid(pid1, &status1, 0);
+
+    if (pid2 > 0) {
+        waitpid(pid2, &status2, 0);
+
+        if (WIFEXITED(status2))
+            return WEXITSTATUS(status2);
+
+        if (WIFSIGNALED(status2))
+            return 128 + WTERMSIG(status2);
+    }
+
+    return 1;
 }
